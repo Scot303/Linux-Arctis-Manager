@@ -32,12 +32,17 @@
         "mic_gain_high": "High",
         "mic_side_tone_none": "None",
         "mic_side_tone_high": "High",
+        
+        "mic_led_off" : "Led Off",
+        "mic_led_high" : "Led High",
+
 
         "perc_10": "10%",
         "perc_100": "100%",
 
         "pm_shutdown_disabled": "Disabled",
         "pm_shutdown_60_minutes": "60 minutes",
+        "pm_shutdown_90_minutes": "90 minutes",
 
         "wireless_mode_speed": "Speed",
         "wireless_mode_range": "Range"
