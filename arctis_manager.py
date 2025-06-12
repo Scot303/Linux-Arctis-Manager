@@ -76,7 +76,7 @@ if __name__ == '__main__':
         try:
             await coro
         except Exception as e:
-            logger.critical(e)
+            logger.critical("Unhandled exception in async task:", exc_info=True)
             sigterm_handler()
 
     if not args.daemon_only:

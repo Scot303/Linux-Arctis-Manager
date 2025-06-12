@@ -247,19 +247,24 @@ class ArctisManagerDaemon:
         return int(round((volume * mix) * 100, 0))
 
     async def listen_usb_endpoint(self, interface_endpoint: InterfaceEndpoint) -> None:
+        endpoint_addr = None
         try:
-            # interface index of the USB HID for the ChatMix dial might differ from the interface number on the device itself
-            self.interface: usb.core.Interface = self.device[0].interfaces()[interface_endpoint.interface]
-            self.interface_num = self.interface.bInterfaceNumber
-            self.endpoint = self.interface.endpoints()[interface_endpoint.endpoint]
-            self.addr = self.endpoint.bEndpointAddress
+            interface_obj: usb.core.Interface = self.device[0].interfaces()[interface_endpoint.interface]
+            endpoint_obj = interface_obj.endpoints()[interface_endpoint.endpoint]
+            endpoint_addr = endpoint_obj.bEndpointAddress
         except Exception:
             self.log.error(f'Unable to find interface {interface_endpoint.interface} / endpoint {interface_endpoint.endpoint}.', exc_info=True)
             self.die_gracefully(error_phase="identification of USB endpoint")
+            return
 
         while not self._shutdown:
             try:
-                read_input = await asyncio.to_thread(self.device.read, self.addr, 64)
+                if endpoint_addr is None:
+                    self.log.error(f"Endpoint address not initialized for interface {interface_endpoint.interface}, endpoint {interface_endpoint.endpoint}. Skipping read.")
+                    await asyncio.sleep(1) # Prevent tight loop
+                    continue
+
+                read_input = await asyncio.to_thread(self.device.read, endpoint_addr, 64)
                 device_state = self.device_manager.manage_input_data(read_input, interface_endpoint)
 
                 default_device_volume = "{}%".format(self._normalize_audio(device_state.game_volume, device_state.game_mix))
