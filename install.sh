@@ -43,7 +43,7 @@ function install() {
     superuserdo mkdir -p "${icons_dir}"
 
     echo "Running pyinstaller to generate binary files"
-    # python3 -m pip install --upgrade pipenv
+    python3 -m pip install --upgrade pipenv
     python -m pipenv install -d
     python -m pipenv run pyinstaller arctis-manager.spec
     python -m pipenv run pyinstaller arctis-manager-launcher.spec
