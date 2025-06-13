@@ -22,6 +22,56 @@ from arctis_manager.config_manager import ConfigManager
 class SettingsWindow(QWidget):
     manager: DeviceManager
 
+    KEY_DEVICE_STATUS = 'device_status'
+    KEY_AUDIO = 'audio'
+    KEY_SECTIONS = 'sections'
+    KEY_SETTINGS = 'settings'
+    KEY_SETTING_VALUES = 'setting_values'
+    KEY_APP_SETTINGS_WINDOW_TITLE = 'app.settings_window_title'
+    KEY_CURRENT_VALUE = 'current_value'
+
+    SLIDER_QSS = """
+        QSlider::groove:horizontal {
+            border: 1px solid #1E1E1E;
+            background: #2E2E2E;
+            height: 6px;
+            border-radius: 5px;
+        }
+
+        QSlider::sub-page:horizontal {
+            background: #0BF;
+            border: 1px solid #00A0DD;
+            height: 6px;
+            border-radius: 5px;
+        }
+
+        QSlider::add-page:horizontal {
+            background: #4A4A4A;
+            border: 1px solid #1E1E1E;
+            height: 6px;
+            border-radius: 5px;
+        }
+
+        QSlider::handle:horizontal {
+            background: #A9A9A9;
+            border: 1px solid #808080;
+            width: 12px;
+            height: 12px;
+            margin: -5px 0;
+            border-radius: 7px;
+        }
+
+        QSlider::handle:horizontal:hover {
+            background: #C0C0C0;
+            border: 1px solid #A9A9A9;
+        }
+
+        QSlider::handle:horizontal:pressed {
+            background: #808080;
+            border: 1px solid #606060;
+        }
+    """
+
     def __init__(self, manager: DeviceManager, status: DeviceStatus, parent: QWidget = None):
         super().__init__(parent=parent)
 
@@ -30,7 +80,7 @@ class SettingsWindow(QWidget):
 
         i18n = Translations.get_instance()
 
-        self.setWindowTitle(i18n.get_translation('app.settings_window_title'))
+        self.setWindowTitle(i18n.get_translation(self.KEY_APP_SETTINGS_WINDOW_TITLE))
         # Note: Wayland does not support window icons (yet?)
         self.setWindowIcon(QIcon(get_icon_pixmap()))
 
@@ -42,7 +92,7 @@ class SettingsWindow(QWidget):
         all_configurable_settings = manager.get_configurable_settings(status)
 
         section_list = QListWidget()
-        panel_stack = QStackedWidget()
+        self.panel_stack = QStackedWidget()
 
         # --- Determine the order of sections ---
         # "device_status" is always first.
@@ -50,9 +100,9 @@ class SettingsWindow(QWidget):
         # Others follow in their original relative order.
         
         ordered_section_keys = []
-        ordered_section_keys.append('device_status')
+        ordered_section_keys.append(self.KEY_DEVICE_STATUS)
 
-        audio_section_key = 'audio'
+        audio_section_key = self.KEY_AUDIO
         remaining_setting_keys = list(all_configurable_settings.keys()) 
 
         if audio_section_key in remaining_setting_keys:
@@ -62,20 +112,20 @@ class SettingsWindow(QWidget):
         ordered_section_keys.extend(remaining_setting_keys)
 
         # --- Populate section_list and panel_stack in synchronized order ---
-        setting_values_translations = i18n.get_translation('setting_values')
+        setting_values_translations = i18n.get_translation(self.KEY_SETTING_VALUES)
         if not isinstance(setting_values_translations, dict):
-            self.log.error(f"Failed to load 'setting_values' translations as a dictionary. Got: {type(setting_values_translations)}")
+            self.log.error(f"Failed to load '{self.KEY_SETTING_VALUES}' translations as a dictionary. Got: {type(setting_values_translations)}")
             setting_values_translations = {}
 
         for section_key in ordered_section_keys:
-            section_list.addItem(i18n.get_translation('sections', section_key))
+            section_list.addItem(i18n.get_translation(self.KEY_SECTIONS, section_key))
 
-            if section_key == 'device_status':
+            if section_key == self.KEY_DEVICE_STATUS:
                 self._status_panel = QWidget()
                 status_layout = QFormLayout()
                 status_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
                 self._status_panel.setLayout(status_layout)
-                panel_stack.addWidget(self._status_panel)
+                self.panel_stack.addWidget(self._status_panel)
                 self.update_status(status)
             else:
                 # Regular settings panel
@@ -86,7 +136,7 @@ class SettingsWindow(QWidget):
                 layout.setVerticalSpacing(15)
 
                 for setting in settings_for_panel:
-                    setting_name_translated = i18n.get_translation('settings', setting.setting_key)
+                    setting_name_translated = i18n.get_translation(self.KEY_SETTINGS, setting.setting_key)
                     master_label_widget = QLabel(setting_name_translated)
                     master_label_widget.setStyleSheet("color: #FFFFFF; font-weight: bold;")
                     layout.addRow(master_label_widget)
@@ -112,7 +162,7 @@ class SettingsWindow(QWidget):
                         layout.addRow(actual_widget_layout)
                 
                 panel.setLayout(layout)
-                panel_stack.addWidget(panel)
+                self.panel_stack.addWidget(panel)
         
         section_list.setFixedWidth(max(section_list.sizeHintForColumn(0), 200))
         section_list.currentRowChanged.connect(self.change_panel)
@@ -122,7 +172,7 @@ class SettingsWindow(QWidget):
         body_widget = QWidget()
         body_layout = QHBoxLayout()
         body_layout.addWidget(section_list)
-        body_layout.addWidget(panel_stack)
+        body_layout.addWidget(self.panel_stack)
         body_widget.setLayout(body_layout)
 
         # Device name widget
@@ -150,12 +200,10 @@ class SettingsWindow(QWidget):
                 widget.deleteLater()
 
         menu_sections = get_translated_menu_entries(status)
-        current_device_name = self.manager.get_device_name()
 
-        # Use ConfigManager to get the resolved configuration for the current device
         config_manager = ConfigManager.get_instance()
         device_specific_visibility_config = config_manager.get_device_config(
-            device_name=current_device_name,
+            device_name=self.manager.get_device_name(),
             log=self.log
         )
         
@@ -192,28 +240,7 @@ class SettingsWindow(QWidget):
 
                     rendered_string = str(item_to_display)
                     
-                    rich_text_content = ""
-                    placeholder = "{status}"
-
-                    if placeholder in template_string:
-                        parts = template_string.split(placeholder, 1)
-                        prefix = parts[0]
-                        suffix = parts[1] if len(parts) > 1 else ""
-
-                        dynamic_value = rendered_string
-                        if rendered_string.startswith(prefix):
-                            dynamic_value = dynamic_value[len(prefix):]
-                        if suffix and rendered_string.endswith(suffix):
-                            dynamic_value = dynamic_value[:-len(suffix)]
-                        
-                        # Escape all parts for safety before constructing rich text
-                        escaped_prefix = escape(prefix)
-                        escaped_dynamic_value = escape(dynamic_value)
-                        escaped_suffix = escape(suffix)
-                        
-                        rich_text_content = f"{escaped_prefix}<b>{escaped_dynamic_value}</b>{escaped_suffix}"
-                    else:
-                        rich_text_content = escape(rendered_string)
+                    rich_text_content = self._create_rich_text_status(template_string, rendered_string)
 
                     value_label = QLabel(rich_text_content)
                     value_label.setTextFormat(Qt.TextFormat.RichText)
@@ -221,12 +248,31 @@ class SettingsWindow(QWidget):
                     
                     layout.addRow('', value_label)
 
-    def change_panel(self, index):
-        panel_stack_widget = self.findChild(QStackedWidget)
-        if panel_stack_widget:
-            panel_stack_widget.setCurrentIndex(index)
+    def _create_rich_text_status(self, template_string: str, rendered_string: str, placeholder: str = "{status}") -> str:
+        if placeholder in template_string:
+            parts = template_string.split(placeholder, 1)
+            prefix = parts[0]
+            suffix = parts[1] if len(parts) > 1 else ""
+
+            dynamic_value = rendered_string
+            if rendered_string.startswith(prefix):
+                dynamic_value = dynamic_value[len(prefix):]
+            if suffix and rendered_string.endswith(suffix):
+                dynamic_value = dynamic_value[:-len(suffix)]
+            
+            escaped_prefix = escape(prefix)
+            escaped_dynamic_value = escape(dynamic_value)
+            escaped_suffix = escape(suffix)
+            
+            return f"{escaped_prefix}<b>{escaped_dynamic_value}</b>{escaped_suffix}"
         else:
-            self.log.error("panel_stack (QStackedWidget) not found in change_panel.")
+            return escape(rendered_string)
+
+    def change_panel(self, index):
+        if self.panel_stack:
+            self.panel_stack.setCurrentIndex(index)
+        else:
+            self.log.error("self.panel_stack (QStackedWidget) not found in change_panel.")
 
     def get_slider_configuration_widget(
         self, min_val: int, max_val: int, step: int, default_value: int, min_label: str, max_label: str, on_value_changed: Optional[Callable[[int], None]]
@@ -236,48 +282,7 @@ class SettingsWindow(QWidget):
 
         controller = QSlider(orientation=Qt.Orientation.Horizontal)
         
-        qss = """
-            QSlider::groove:horizontal {
-                border: 1px solid #1E1E1E;
-                background: #2E2E2E;
-                height: 6px;
-                border-radius: 5px;
-            }
-
-            QSlider::sub-page:horizontal {
-                background: #0BF;
-                border: 1px solid #00A0DD;
-                height: 6px;
-                border-radius: 5px;
-            }
-
-            QSlider::add-page:horizontal {
-                background: #4A4A4A;
-                border: 1px solid #1E1E1E;
-                height: 6px;
-                border-radius: 5px;
-            }
-
-            QSlider::handle:horizontal {
-                background: #A9A9A9;
-                border: 1px solid #808080;
-                width: 12px;
-                height: 12px;
-                margin: -5px 0;
-                border-radius: 7px;
-            }
-
-            QSlider::handle:horizontal:hover {
-                background: #C0C0C0;
-                border: 1px solid #A9A9A9;
-            }
-
-            QSlider::handle:horizontal:pressed {
-                background: #808080;
-                border: 1px solid #606060;
-            }
-        """
-        controller.setStyleSheet(qss)
+        controller.setStyleSheet(self.SLIDER_QSS)
 
         controller.setMinimum(min_val)
         controller.setMaximum(max_val)
@@ -302,14 +307,13 @@ class SettingsWindow(QWidget):
         current_value_hbox.setContentsMargins(0, 0, 0, 0)
         current_value_hbox.setSpacing(3)
 
-        # Use "current_value" translation and make it bold
-        current_value_text_label = QLabel(Translations.get_instance().get_translation('setting_values', 'current_value') + ":")
+        current_value_text_label = QLabel(Translations.get_instance().get_translation(self.KEY_SETTING_VALUES, self.KEY_CURRENT_VALUE) + ":")
         current_value_text_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
         
         current_value_hbox.addWidget(current_value_text_label)
         current_value_hbox.addWidget(current_value_label)
-        current_value_hbox.addStretch(1) # Push to left
-        current_value_hbox.insertStretch(0,1) # Add stretch before to center the group
+        current_value_hbox.addStretch(1)
+        current_value_hbox.insertStretch(0,1)
 
         # Add widgets to the grid
         grid_layout.addWidget(min_label_widget, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

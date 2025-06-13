@@ -108,7 +108,7 @@ class ArctisNova7Device(DeviceManager):
                 headset_battery_charge=DeviceStatusValue(data[2], mapped_val=lambda x: x / BATTERY_MAX),
                 headset_power_status=DeviceStatusValue(data[3], POWER_STATUS_MAP.get(data[3], 'connection.online')),
                 bluetooth_powerup_state=DeviceStatusValue(data[6], 'on_off.off' if data[6] == HeadsetStatus.OFFLINE else 'on_off.on'),
-                mic_led_brightness=DeviceStatusValue(data[10], mapped_val=lambda x: {0: 0, 1: 0.33, 2: 0.66, 3: 1}.get(x, 0))
+                mic_led_brightness=DeviceStatusValue(self._local_config['mic_led_brightness'], mapped_val=lambda x: {0: 0, 1: 0.33, 2: 0.66, 3: 1}.get(x, 0))
             )
             if data[3] != HeadsetStatus.OFFLINE:
                 self.game_mix = data[4] / 100
