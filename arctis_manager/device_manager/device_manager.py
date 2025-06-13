@@ -87,6 +87,13 @@ class DeviceManager(ABC):
         '''
         pass
 
+    @abstractmethod
+    def refresh_device_data(self) -> None:
+        '''
+        Refresh the device data/state.
+        '''
+        pass
+
     def get_audio_position(self) -> list[ChannelPosition]:
         '''
         Get the list of channel positions, defaulting to FL, FR.

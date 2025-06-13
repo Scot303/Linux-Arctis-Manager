@@ -67,7 +67,3 @@ class ToggleSetting(DeviceSetting):
 
     def on_value_change(self, value) -> None:
         self.callback(value)
-
-
-class SliderSertting(DeviceSetting):
-    pass

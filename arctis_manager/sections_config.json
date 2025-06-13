@@ -1,0 +1,79 @@
+{
+  "device_item_visibility": {
+    "Arctis Nova Pro Wireless": {
+      "sections.battery": {
+        "menu.headset_power_status": true,
+        "menu.headset_battery_charge": true,
+        "menu.charge_slot_battery_charge": true
+      },
+      "sections.microphone": {
+        "menu.mic_status": true,
+        "menu.mic_led_brightness": true
+      },
+      "sections.anc": {
+        "menu.noise_cancelling": true,
+        "menu.transparent_noise_cancelling_level": true
+      },
+      "sections.wireless_mode": {
+        "menu.wireless_pairing": true,
+        "menu.wireless_mode": true
+      },
+      "sections.bluetooth": {
+        "menu.bluetooth_powerup_state": true,
+        "menu.bluetooth_power_status": true,
+        "menu.bluetooth_auto_mute": true,
+        "menu.bluetooth_connection": true
+      }
+    },
+    "Arctis Nova 7": {
+      "sections.battery": {
+        "menu.headset_power_status": true,
+        "menu.headset_battery_charge": true,
+        "menu.charge_slot_battery_charge": false 
+      },
+      "sections.microphone": {
+        "menu.mic_status": false,
+        "menu.mic_led_brightness": true 
+      },
+      "sections.anc": {
+        "menu.noise_cancelling": false,
+        "menu.transparent_noise_cancelling_level": false
+      },
+      "sections.wireless_mode": {
+        "menu.wireless_pairing": false,
+        "menu.wireless_mode": false
+      },
+      "sections.bluetooth": {
+        "menu.bluetooth_powerup_state": true,
+        "menu.bluetooth_power_status": false,
+        "menu.bluetooth_auto_mute": false,
+        "menu.bluetooth_connection": false
+      }
+    },
+    "Default": {
+      "sections.battery": {
+        "menu.headset_power_status": true,
+        "menu.headset_battery_charge": true,
+        "menu.charge_slot_battery_charge": false
+      },
+      "sections.microphone": {
+        "menu.mic_status": false,
+        "menu.mic_led_brightness": false
+      },
+      "sections.anc": {
+        "menu.noise_cancelling": false,
+        "menu.transparent_noise_cancelling_level": false
+      },
+      "sections.wireless_mode": {
+        "menu.wireless_pairing": false,
+        "menu.wireless_mode": false
+      },
+      "sections.bluetooth": {
+        "menu.bluetooth_powerup_state": false,
+        "menu.bluetooth_power_status": false,
+        "menu.bluetooth_auto_mute": false,
+        "menu.bluetooth_connection": false
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 {
     "app": {
         "settings_label": "Settings",
-        "settings_window_title": "Arctis Manager"
+        "settings_window_title": "Arctis Manager",
+        "refresh_button_label": "Refresh Device Data"
     },
     
     "sections": {
@@ -9,6 +10,7 @@
         "battery": "Battery",
         "bluetooth": "Bluetooth",
         "device_status": "Device status",
+        "audio": "Audio",
         "microphone": "Microphone",
         "power_management": "Power management",
         "wireless": "Wireless",
@@ -23,10 +25,16 @@
 
         "wireless_mode":"Wireless mode",
 
-        "pm_shutdown": "Shutdown after"
+        "pm_shutdown": "Shutdown after",
+
+        "game_volume": "Master Game Volume",
+        "chat_volume": "Master Chat Volume",
+        "volume_limiter": "Volume Limiter"
     },
 
     "setting_values": {
+        "volume_0_perc": "0%",
+        "volume_100_perc": "100%",
         "mic_volume_muted": "Muted",
         "mic_gain_low": "Low",
         "mic_gain_high": "High",
@@ -45,7 +53,11 @@
         "pm_shutdown_90_minutes": "90 minutes",
 
         "wireless_mode_speed": "Speed",
-        "wireless_mode_range": "Range"
+        "wireless_mode_range": "Range",
+        "volume_limiter_off": "Off",
+        "volume_limiter_on": "On",
+        "value": "Value",
+        "current_value": "Current value"
     },
 
     "device_status_values": {
@@ -53,7 +65,7 @@
         "connection": {
             "connected": "connected", "disconnected": "disconnected",
             "online": "online", "offline": "offline",
-            "cable_charging": "charging (cable)"
+            "cable_charging": "charging"
         },
         "db": { "-12db": "-12db" },
         "mic_status": { "muted": "muted", "unmuted": "unmuted" },
@@ -78,7 +90,7 @@
         "mic_status": "Mic status: {status}",
         "mic_led_brightness": "Mic LED brightness: {status}%",
 
-        "bluetooth_powerup_state": "Bluetooth turned on: {status}",
+        "bluetooth_powerup_state": "Bluetooth: {status}",
         "bluetooth_power_status": "Bluetooth status: {status}",
         "bluetooth_auto_mute": "Bluetooth mute: {status}",
         "bluetooth_connection": "Bluetooth connection: {status}"

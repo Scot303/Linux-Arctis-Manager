@@ -24,3 +24,7 @@ class Arctis7PlusDevice(DeviceManager):
 
     def get_request_device_status(self):
         return self.utility_guess_endpoint(7, 'out'), [0x06, 0xb0]
+
+    def refresh_device_data(self) -> None:
+        # TODO: Implement actual data refresh logic if needed for Arctis 7+
+        pass

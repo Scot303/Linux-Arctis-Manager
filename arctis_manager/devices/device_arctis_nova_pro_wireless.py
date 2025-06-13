@@ -21,9 +21,15 @@ INACTIVE_TIME_MINUTES = {
 STATUS_REQUEST_MESSAGE = [0x06, 0xb0]
 
 
+DEFAULT_GAME_VOLUME = 100  # 0-100
+DEFAULT_CHAT_VOLUME = 100  # 0-100
+
+
 class ArctisNovaProWirelessDevice(DeviceManager):
     game_mix: int = None
     chat_mix: int = None
+    game_volume: int = None
+    chat_volume: int = None
 
     def get_local_settings(self) -> dict[str, int]:
         '''
@@ -38,8 +44,11 @@ class ArctisNovaProWirelessDevice(DeviceManager):
             'mic_gain': 0x02,  # high
             'mic_led_brightness': 0x0a,  # 100%
             'pm_shutdown': 0x05,  # 30 minutes
+            'game_volume': DEFAULT_GAME_VOLUME,
+            'chat_volume': DEFAULT_CHAT_VOLUME,
         }
-
+        self.game_volume = self._local_config.get('game_volume', DEFAULT_GAME_VOLUME)
+        self.chat_volume = self._local_config.get('chat_volume', DEFAULT_CHAT_VOLUME)
         return self._local_config
 
     def save_local_settings(self) -> None:
@@ -120,8 +129,13 @@ class ArctisNovaProWirelessDevice(DeviceManager):
             self.send_06_command(command[0], False)
 
     def manage_input_data(self, data: list[int], endpoint: InterfaceEndpoint) -> DeviceState:
-        volume = 1
         device_status = None
+
+        # Ensure volumes are loaded if not already
+        if self.game_volume is None:
+            self.game_volume = self.get_local_settings().get('game_volume', DEFAULT_GAME_VOLUME)
+        if self.chat_volume is None:
+            self.chat_volume = self.get_local_settings().get('chat_volume', DEFAULT_CHAT_VOLUME)
 
         if endpoint == InterfaceEndpoint(7, 0):
             # Volume control is managed by the GameDAC
@@ -160,13 +174,16 @@ class ArctisNovaProWirelessDevice(DeviceManager):
             self.log.debug(f'Incoming data from {endpoint.interface}, {endpoint.endpoint}: [{':'.join(hex(x)[2:] for x in data)}]')
 
         return DeviceState(
-            game_volume=volume,
-            chat_volume=volume,
+            game_volume=self.game_volume / 100.0,
+            chat_volume=self.chat_volume / 100.0,
             game_mix=self.game_mix if self.game_mix is not None else 1,
             chat_mix=self.chat_mix if self.chat_mix is not None else 1,
             device_status=device_status,
         )
 
+    def refresh_device_data(self) -> None:
+        self.send_06_command(STATUS_REQUEST_MESSAGE)
+        
     @staticmethod
     def packet_0_filler(packet: list[int], size: int):
         return [*packet, *[0 for _ in range(size - len(packet))]]
@@ -192,6 +209,28 @@ class ArctisNovaProWirelessDevice(DeviceManager):
             'wireless': [
                 ToggleSetting('wireless_mode', 'wireless_mode_range', 'wireless_mode_speed', state.wireless_mode.value == 0x01, self.on_wireless_mode_change),
             ],
+            'audio': [
+                SliderSetting(
+                    setting_key='game_volume',
+                    min_value_translation_key='volume_0_perc',
+                    max_value_translation_key='volume_100_perc',
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    current_state=local_settings.get('game_volume', DEFAULT_GAME_VOLUME),
+                    on_value_changed=self.on_game_volume_change
+                ),
+                SliderSetting(
+                    setting_key='chat_volume',
+                    min_value_translation_key='volume_0_perc',
+                    max_value_translation_key='volume_100_perc',
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    current_state=local_settings.get('chat_volume', DEFAULT_CHAT_VOLUME),
+                    on_value_changed=self.on_chat_volume_change
+                ),
+            ]
         }
 
     def on_mic_volume_change(self, value: int):
@@ -242,6 +281,18 @@ class ArctisNovaProWirelessDevice(DeviceManager):
         self._local_config['wireless_mode'] = value
         self.save_local_settings()
 
+        self.send_06_command(STATUS_REQUEST_MESSAGE)
+
+    def on_game_volume_change(self, value: int):
+        self.game_volume = value
+        self._local_config['game_volume'] = value
+        self.save_local_settings()
+        self.send_06_command(STATUS_REQUEST_MESSAGE)
+
+    def on_chat_volume_change(self, value: int):
+        self.chat_volume = value
+        self._local_config['chat_volume'] = value
+        self.save_local_settings()
         self.send_06_command(STATUS_REQUEST_MESSAGE)
 
     def send_06_command(self, command: list[int], kernel_detach: bool = False) -> None:

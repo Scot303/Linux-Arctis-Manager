@@ -18,6 +18,7 @@ systemd_service_file="systemd/arctis-manager.service"
 udev_rules_file="udev/91-steelseries-arctis.rules"
 desktop_file="ArctisManager.desktop"
 icon_file="arctis_manager/images/steelseries_logo.svg"
+sections_config_file="arctis_manager/sections_config.json"
 
 # Install directories
 applications_dir="${chroot_path}${install_prefix}/share/applications/"
@@ -42,7 +43,7 @@ function install() {
     superuserdo mkdir -p "${icons_dir}"
 
     echo "Running pyinstaller to generate binary files"
-    python3 -m pip install --upgrade pipenv
+    # python3 -m pip install --upgrade pipenv
     python -m pipenv install -d
     python -m pipenv run pyinstaller arctis-manager.spec
     python -m pipenv run pyinstaller arctis-manager-launcher.spec
@@ -81,6 +82,39 @@ function install() {
     if [ "${chroot_path}" == "" ]; then
         systemctl --user enable --now "$(basename ${systemd_service_file})"
     fi
+
+    echo "Installing default sections configuration (if not already present)."
+    
+    # Determine the target user's home directory
+    if [ -n "$SUDO_USER" ]; then
+        USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    else
+        USER_HOME="$HOME"
+    fi
+
+    user_config_dir="${XDG_CONFIG_HOME:-$USER_HOME/.config}/arctis_manager"
+    user_sections_config_file="${user_config_dir}/$(basename "${sections_config_file}")"
+
+    superuserdo mkdir -p "$user_config_dir"
+    # If created by root for a $SUDO_USER (and not in chroot), set correct ownership
+    if [ "${chroot_path}" == "" ] && [ -n "$SUDO_USER" ]; then
+        superuserdo chown "$SUDO_USER":"$(id -g "$SUDO_USER")" "$user_config_dir"
+    fi
+    
+    # Copy default sections config if source exists and user doesn't have one
+    if [ -f "$sections_config_file" ]; then
+        if [ ! -f "$user_sections_config_file" ]; then
+            superuserdo cp "$sections_config_file" "$user_sections_config_file"
+            if [ "${chroot_path}" == "" ] && [ -n "$SUDO_USER" ]; then
+                superuserdo chown "$SUDO_USER":"$(id -g "$SUDO_USER")" "$user_sections_config_file"
+            fi
+            echo "Default sections configuration copied to $user_sections_config_file"
+        else
+            echo "User sections configuration already exists at $user_sections_config_file. Skipping copy."
+        fi
+    else
+        echo "WARNING: Source sections configuration file not found at $user_sections_config_file. Cannot copy default."
+    fi
 }
 
 function uninstall() {
@@ -103,7 +137,6 @@ function uninstall() {
 
     # Remove the custom lib dir
     echo "Removing application data."
-    sudo rm -rf "${lib_dir}" 2>/dev/null
     for file in "${bin_files[@]}"; do
         sudo rm -rf "${bin_dir}/$(basename "${file}")" 2>/dev/null
     done

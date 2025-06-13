@@ -26,7 +26,7 @@ def get_translated_menu_entries(status: DeviceStatus) -> dict[TranslatableText, 
                 'menu.charge_slot_battery_charge').format(status=str_or_none(status.charge_slot_battery_charge * 100))),
         ],
         TranslatableText('sections.microphone'): [
-            else_none(status.headset_battery_charge, lambda: TranslatableText('menu.mic_status').format(status=str_or_none(status.mic_status))),
+            else_none(status.mic_status, lambda: TranslatableText('menu.mic_status').format(status=str_or_none(status.mic_status))),
             else_none(status.mic_led_brightness, lambda: TranslatableText('menu.mic_led_brightness').format(status=str_or_none(status.mic_led_brightness * 100))),
         ],
         TranslatableText('sections.anc'): [
