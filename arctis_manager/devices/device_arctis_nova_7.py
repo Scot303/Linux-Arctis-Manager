@@ -27,10 +27,27 @@ DEFAULT_MIC_VOLUME = 127                # 0-127
 DEFAULT_MIC_SIDE_TONE = 0               # 0-3
 DEFAULT_INACTIVE_TIME = 30              # 0-90 !STEP 15!
 DEFAULT_MIC_MUTE_LED_BRIGHTNESS = 3     # 0-3
+DEFAULT_GAME_VOLUME = 100               # 0-100
+DEFAULT_CHAT_VOLUME = 100               # 0-100
+
+INACTIVE_TIME_MINUTES = {
+    0: 0,
+    1: 1,
+    2: 5,
+    3: 10,
+    4: 15,
+    5: 30,
+    6: 45,
+    7: 60,
+    8: 75,
+    9: 90
+}
 
 class ArctisNova7Device(DeviceManager):
     game_mix: int = None
     chat_mix: int = None
+    game_volume: int = None
+    chat_volume: int = None
     device_status: Optional[DeviceStatus] = None
 
     def init_device(self):
@@ -62,7 +79,11 @@ class ArctisNova7Device(DeviceManager):
             'mic_side_tone': DEFAULT_MIC_SIDE_TONE,
             'mic_led_brightness': DEFAULT_MIC_MUTE_LED_BRIGHTNESS,
             'pm_shutdown': DEFAULT_INACTIVE_TIME,
+            'game_volume': DEFAULT_GAME_VOLUME,
+            'chat_volume': DEFAULT_CHAT_VOLUME,
         }
+        self.game_volume = self._local_config.get('game_volume', DEFAULT_GAME_VOLUME)
+        self.chat_volume = self._local_config.get('chat_volume', DEFAULT_CHAT_VOLUME)
         return self._local_config
 
     def save_local_settings(self) -> None:
@@ -83,6 +104,7 @@ class ArctisNova7Device(DeviceManager):
 
     def manage_input_data(self, data: list[int], endpoint: InterfaceEndpoint) -> DeviceState:
         device_status = None
+        print(data)
 
         if endpoint == InterfaceEndpoint(7, 0):
             if data[0] == REPORT_ID_CHATMIX:
@@ -93,6 +115,8 @@ class ArctisNova7Device(DeviceManager):
 
         elif endpoint == InterfaceEndpoint(5, 0):
             if data[0] == REPORT_ID_STATUS_RESPONSE:
+                data[10] = self.get_local_settings().get('mic_led_brightness', DEFAULT_MIC_MUTE_LED_BRIGHTNESS)
+
                 device_status = DeviceStatus(
                     headset_battery_charge=DeviceStatusValue(
                         data[2], mapped_val=lambda x: (x / BATTERY_MAX)
@@ -102,6 +126,9 @@ class ArctisNova7Device(DeviceManager):
                     ),
                     bluetooth_powerup_state=DeviceStatusValue(
                         data[6], 'on_off.off' if data[6] == HEADSET_STATUS_OFFLINE else 'on_off.on'
+                    ),
+                    mic_led_brightness=DeviceStatusValue(
+                        data[10], mapped_val=lambda x: {0: 0, 1: 0.33, 2: 0.66, 3: 1}.get(x, 0)
                     )
                 )
                 
@@ -114,13 +141,22 @@ class ArctisNova7Device(DeviceManager):
                 self.log.debug(f"Received a short/unknown packet: {data}")
 
 
+        # Ensure volumes are loaded if not already
+        if self.game_volume is None:
+            self.game_volume = self.get_local_settings().get('game_volume', DEFAULT_GAME_VOLUME)
+        if self.chat_volume is None:
+            self.chat_volume = self.get_local_settings().get('chat_volume', DEFAULT_CHAT_VOLUME)
+
         return DeviceState(
-            game_volume=1,
-            chat_volume=1,
+            game_volume=self.game_volume / 100.0,
+            chat_volume=self.chat_volume / 100.0,
             game_mix=self.game_mix if self.game_mix is not None else 1,
             chat_mix=self.chat_mix if self.chat_mix is not None else 1,
             device_status=device_status
         )
+
+    def refresh_device_data(self) -> None:
+        self.send_command([CMD_POLL_STATUS])
 
     @staticmethod
     def packet_0_filler(packet: list[int], size: int):
@@ -169,11 +205,33 @@ class ArctisNova7Device(DeviceManager):
                     min_value_translation_key='pm_shutdown_disabled',
                     max_value_translation_key='pm_shutdown_90_minutes',
                     min_value=0,
-                    max_value=90,
-                    step=15,
+                    max_value=9,
+                    step=1,
                     current_state=local_settings.get('pm_shutdown', DEFAULT_INACTIVE_TIME),
                     on_value_changed=self.on_pm_shutdown_change
                 )
+            ],
+            'audio': [
+                SliderSetting(
+                    setting_key='game_volume',
+                    min_value_translation_key='volume_0_perc',
+                    max_value_translation_key='volume_100_perc',
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    current_state=local_settings.get('game_volume', DEFAULT_GAME_VOLUME),
+                    on_value_changed=self.on_game_volume_change
+                ),
+                SliderSetting(
+                    setting_key='chat_volume',
+                    min_value_translation_key='volume_0_perc',
+                    max_value_translation_key='volume_100_perc',
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    current_state=local_settings.get('chat_volume', DEFAULT_CHAT_VOLUME),
+                    on_value_changed=self.on_chat_volume_change
+                ),
             ]
         }
 
@@ -216,8 +274,21 @@ class ArctisNova7Device(DeviceManager):
     def on_pm_shutdown_change(self, value: int):
         # 0-90
         # step 15
-        self.send_command([CMD_INACTIVE_TIME, value])
+        time = INACTIVE_TIME_MINUTES[value] if value >= 0 and value <= 9 else 0
+        self.send_command([CMD_INACTIVE_TIME, time])
         self.send_command([CMD_SAVE_SETTINGS])
-        self._local_config['pm_shutdown'] = value
+        self._local_config['pm_shutdown'] = time
+        self.save_local_settings()
+        self.send_command([CMD_POLL_STATUS])
+
+    def on_game_volume_change(self, value: int):
+        self.game_volume = value
+        self._local_config['game_volume'] = value
+        self.save_local_settings()
+        self.send_command([CMD_POLL_STATUS]) 
+
+    def on_chat_volume_change(self, value: int):
+        self.chat_volume = value
+        self._local_config['chat_volume'] = value
         self.save_local_settings()
         self.send_command([CMD_POLL_STATUS])
