@@ -174,8 +174,8 @@ class ArctisNovaProWirelessDevice(DeviceManager):
             self.log.debug(f'Incoming data from {endpoint.interface}, {endpoint.endpoint}: [{':'.join(hex(x)[2:] for x in data)}]')
 
         return DeviceState(
-            game_volume=self.game_volume / 100.0,
-            chat_volume=self.chat_volume / 100.0,
+            game_volume=self.game_volume / 100,
+            chat_volume=self.chat_volume / 100,
             game_mix=self.game_mix if self.game_mix is not None else 1,
             chat_mix=self.chat_mix if self.chat_mix is not None else 1,
             device_status=device_status,

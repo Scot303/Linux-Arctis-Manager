@@ -120,10 +120,10 @@ class ArctisNova7Device(DeviceManager):
 
 
         return DeviceState(
-            game_volume=self.game_volume / 100.0,
-            chat_volume=self.chat_volume / 100.0,
-            game_mix=self.game_mix or 1.0,
-            chat_mix=self.chat_mix or 1.0,
+            game_volume=self.game_volume / 100,
+            chat_volume=self.chat_volume / 100,
+            game_mix=self.game_mix if self.game_mix is not None else 1,
+            chat_mix=self.chat_mix if self.chat_mix is not None else 1,
             device_status=self.device_status,
         )
 
