@@ -29,6 +29,7 @@ class SystrayApp:
     app: QApplication
     tray_icon: QSystemTrayIcon
     menu: QMenu
+    last_device_status: Optional[DeviceStatus] = None
 
     def get_systray_icon_pixmap(self, path: Path) -> QPixmap:
         brush_color = QApplication.palette().color(QPalette.ColorRole.Text)
@@ -184,7 +185,7 @@ class SystrayApp:
         displayed_menu_items = self._populate_menu_items(menu_sections, device_specific_visibility_config)
         
         self._device_manager = device_manager
-        self._device_status = status
+        self.last_device_status = status
 
         self._add_utility_actions(device_manager, status)
         self._cleanup_menu_actions(displayed_menu_items)
@@ -208,7 +209,7 @@ class SystrayApp:
             self._settings_window.raise_()
             return
 
-        self._settings_window = SettingsWindow(self._device_manager, self._device_status)
+        self._settings_window = SettingsWindow(self._device_manager, self.last_device_status)
         self._settings_window.setWindowFlags(Qt.WindowType.Window)
 
         self._settings_window.show()

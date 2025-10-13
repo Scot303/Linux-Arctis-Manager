@@ -1,21 +1,22 @@
+from arctis_manager.device_manager import DeviceManager, DeviceStatus, InterfaceEndpoint
+from typing import Callable
 import asyncio
 import inspect
 import logging
 import os
-from pathlib import Path
 import pkgutil
 import re
 import subprocess
 import sys
-from typing import Callable
-
 import usb.core
-
-from arctis_manager.device_manager import DeviceManager, DeviceStatus, InterfaceEndpoint
 import arctis_manager.devices
 
-PA_GAME_NODE_NAME = 'Arctis_Game'
-PA_CHAT_NODE_NAME = 'Arctis_Chat'
+DEV_PA_NODES = {
+    'game': 'Arctis_Game',
+    'chat': 'Arctis_Chat'
+}
+DONGLE_REFRESH_SECONDS = 5
+DEFAULT_SINK = DEV_PA_NODES['game']
 
 
 class ArctisManagerDaemon:
@@ -78,8 +79,8 @@ class ArctisManagerDaemon:
         # Blindly try to cleanup dirty nodes by removing the ones we're going to create
         self.log.debug('Cleaning up PulseAudio nodes.')
         try:
-            os.system(f'pw-cli destroy {PA_GAME_NODE_NAME} 1>/dev/null 2>&1')
-            os.system(f'pw-cli destroy {PA_CHAT_NODE_NAME} 1>/dev/null 2>&1')
+            for node in DEV_PA_NODES.values():
+                os.system(f'pw-cli destroy {node} 1>/dev/null 2>&1')
         finally:
             pass
 
@@ -110,33 +111,23 @@ class ArctisManagerDaemon:
         # Create the game and chat nodes
         self.log.info('Creating PulseAudio Audio/Sink nodes.')
         try:
-            os.system(f"""pw-cli create-node adapter '{{
-                factory.name=support.null-audio-sink
-                node.name=Arctis_Game
-                node.description="{self.device_manager.get_device_name()} Game"
-                media.class=Audio/Sink
-                monitor.channel-volumes=true
-                object.linger=true
-                audio.position=[{' '.join([p.value for p in self.device_manager.get_audio_position()])}]
-                }}' 1>/dev/null
-            """)
-
-            os.system(f"""pw-cli create-node adapter '{{
-                factory.name=support.null-audio-sink
-                node.name=Arctis_Chat
-                node.description="{self.device_manager.get_device_name()} Chat"
-                media.class=Audio/Sink
-                monitor.channel-volumes=true
-                object.linger=true
-                audio.position=[{' '.join([p.value for p in self.device_manager.get_audio_position()])}]
-                }}' 1>/dev/null
-            """)
+            for node_tag, node_name in DEV_PA_NODES.items():
+                os.system(f"""pw-cli create-node adapter '{{
+                    factory.name=support.null-audio-sink
+                    node.name={node_name}
+                    node.description="{self.device_manager.get_device_name()} {node_tag.title()}"
+                    media.class=Audio/Sink
+                    monitor.channel-volumes=true
+                    object.linger=true
+                    audio.position=[{' '.join([p.value for p in self.device_manager.get_audio_position()])}]
+                    }}' 1>/dev/null
+                """)
         except Exception as e:
             self.log.error('Failed to create PulseAudio nodes.', exc_info=True)
             sys.exit(103)
 
         self.log.info('Setting PulseAudio channel links.')
-        for node in [PA_GAME_NODE_NAME, PA_CHAT_NODE_NAME]:
+        for node in DEV_PA_NODES.values():
             try:
                 for position in self.device_manager.get_audio_position():
                     pos_name = position.value
@@ -147,9 +138,9 @@ class ArctisManagerDaemon:
                 sys.exit(104)
 
     def set_default_audio_sink(self) -> None:
-        self.log.info(f'Setting PulseAudio\'s default sink to {PA_GAME_NODE_NAME}.')
+        self.log.info(f'Setting PulseAudio\'s default sink to {DEFAULT_SINK}.')
         self.previous_sink = subprocess.check_output(['pactl', 'get-default-sink']).decode('utf-8').strip()
-        self.set_pa_audio_sink(PA_GAME_NODE_NAME)
+        self.set_pa_audio_sink(DEFAULT_SINK)
 
     def get_pa_default_sink_description(self) -> str:
         default_sink_name = subprocess.check_output(['pactl', 'get-default-sink']).decode('utf-8').strip()
@@ -267,11 +258,12 @@ class ArctisManagerDaemon:
                 read_input = await asyncio.to_thread(self.device.read, endpoint_addr, 64)
                 device_state = self.device_manager.manage_input_data(read_input, interface_endpoint)
 
+                # These lines probably should be collapsed on a single 'for' loop
                 default_device_volume = "{}%".format(self._normalize_audio(device_state.game_volume, device_state.game_mix))
                 virtual_device_volume = "{}%".format(self._normalize_audio(device_state.chat_volume, device_state.chat_mix))
 
-                os.system(f'pactl set-sink-volume Arctis_Game {default_device_volume}')
-                os.system(f'pactl set-sink-volume Arctis_Chat {virtual_device_volume}')
+                os.system(f'pactl set-sink-volume {DEV_PA_NODES['game']} {default_device_volume}')
+                os.system(f'pactl set-sink-volume {DEV_PA_NODES['chat']} {virtual_device_volume}')
 
                 # Propagate the device status to any registered listener
                 if device_state.device_status is not None:
@@ -307,7 +299,7 @@ class ArctisManagerDaemon:
         while not self._shutdown:
             try:
                 self.device.write(commands_endpoint_address, message)
-                await asyncio.sleep(5)
+                await asyncio.sleep(DONGLE_REFRESH_SECONDS)
             except Exception as e:
                 if not isinstance(e, usb.core.USBTimeoutError):
                     if isinstance(e, usb.core.USBError) and e.errno == 19:  # device not found
